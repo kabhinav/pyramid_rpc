@@ -37,7 +37,7 @@ class TestJSONRPCMapper(unittest.TestCase):
         target = self._makeOne()
         view_callable = target(DummyView)
         request = testing.DummyRequest()
-        params = {'jsonrpc':'2.0', 'method':'dummy_view', 
+        params = {'jsonrpc':'2.0', 'method':'dummy_rpc', 
                   'params':[1, 2], 'id':'test'}
         body = json.dumps(params)
         request.json_body = params
@@ -60,7 +60,7 @@ class TestJSONRPCMapper(unittest.TestCase):
         target = self._makeOne()
         view_callable = target(DummyView)
         request = testing.DummyRequest()
-        params = {'jsonrpc':'2.0', 'method':'dummy_view', 
+        params = {'jsonrpc':'2.0', 'method':'dummy_rpc', 
                   'params':dict(a=3, b=4), 'id':'test'}
         body = json.dumps(params)
         request.json_body = params
@@ -85,7 +85,7 @@ class TestJSONRPCMapper(unittest.TestCase):
         target = self._makeOne()
         view_callable = target(DummyView)
         request = testing.DummyRequest()
-        params = {'jsonrpc':'2.0', 'method':'dummy_view', 
+        params = {'jsonrpc':'2.0', 'method':'dummy_rpc', 
                   'params':[], 'id':'test'}
         body = json.dumps(params)
         request.json_body = params
@@ -110,7 +110,7 @@ class TestJSONRPCMapper(unittest.TestCase):
         target = self._makeOne()
         view_callable = target(DummyView)
         request = testing.DummyRequest()
-        params = {'jsonrpc':'2.0', 'method':'dummy_view', 
+        params = {'jsonrpc':'2.0', 'method':'dummy_rpc', 
                   'params':{}, 'id':'test'}
         body = json.dumps(params)
         request.json_body = params
@@ -562,6 +562,13 @@ class FunctionalTest(unittest.TestCase):
         config.add_view(route_name='JSON-RPC', name='dummy_rpc',
                         view=dummy_rpc, mapper=JsonRpcViewMapper,
                         renderer=renderer)
+        
+        config.add_route('JSON-RPC-CLS', 'apis/rpc/cls')
+        config.add_view(jsonrpc_endpoint, route_name='JSON-RPC-CLS')
+        config.add_view(route_name='JSON-RPC-CLS', name='dummy_rpc',
+                        view=DummyView, mapper=JsonRpcViewMapper,
+                        renderer=renderer)
+
         app = config.make_wsgi_app()
         import webtest
         app = webtest.TestApp(app)
@@ -574,6 +581,16 @@ class FunctionalTest(unittest.TestCase):
         self.assertEqual(data['id'], 'test')
         self.assertEqual(data['jsonrpc'], '2.0')
         self.assertEqual(data['result'], 5)
+        
+        res = app.post('/apis/rpc/cls', params=body,
+                       content_type='application/json')
+        data = json.loads(res.body)
+        self.assertEqual(data['id'], 'test')
+        self.assertEqual(data['jsonrpc'], '2.0')
+        self.assertEqual(data['result'], 5)
+
+
+        
 
 
 class DummyRoute:
@@ -596,6 +613,6 @@ class DummyView:
         self.request = request
         return self.response
     
-    def dummy_view(self, request, a, b):
+    def dummy_rpc(self, request, a, b):
         return a + b
 

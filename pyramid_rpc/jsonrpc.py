@@ -1,5 +1,6 @@
 import inspect
 import logging
+import types
 
 from pyramid.compat import json
 from pyramid.exceptions import ConfigurationError
@@ -114,8 +115,9 @@ class JsonRpcViewMapper(object):
 
     This is very limited support.
     
-      - The view callable is assumed only function.
-      - Don't use default values, arbitrary argument lists.
+    - The view callable can be a function or a class.
+    - Creates a new instance of a view callable class to execute a request.
+    - Don't use default values, arbitrary argument lists.
     """
 
     implements(IViewMapper)
@@ -127,15 +129,32 @@ class JsonRpcViewMapper(object):
     def __call__(self, view):
         def _mapped_callable(context, request):
             rpc_args = request.rpc_args
-            args, varargs, keywords, defaults = inspect.getargspec(view)
-            if isinstance(rpc_args, list):
-                if len(args) != len(rpc_args) + 1: # for request
-                    raise JsonRpcParamsInvalid
-                return view(request, *rpc_args)
-            elif isinstance(rpc_args, dict):
-                if sorted(args[1:]) != sorted(rpc_args.keys()):
-                    raise JsonRpcParamsInvalid
-                return view(request, **rpc_args)
+            if isinstance(view, types.FunctionType):
+                args, varargs, keywords, defaults = inspect.getargspec(view)
+                if isinstance(rpc_args, list):
+                    if len(args) != len(rpc_args) + 1: # for request
+                        raise JsonRpcParamsInvalid
+                    return view(request, *rpc_args)
+                elif isinstance(rpc_args, dict):
+                    if sorted(args[1:]) != sorted(rpc_args.keys()):
+                        raise JsonRpcParamsInvalid
+                    return view(request, **rpc_args)
+            else:
+                req_method = request.json_body[u'method']
+                for name, method in inspect.getmembers(view, inspect.ismethod):
+                    #skip 'private' methods
+                    if name.startswith('_'):
+                        continue
+                    if req_method == name:
+                        args, varargs, keywords, defaults = inspect.getargspec(method)
+                        if isinstance(rpc_args, list):
+                            if len(args) != len(rpc_args) + 2: # for self, request
+                                raise JsonRpcParamsInvalid
+                            return method(view(request), request, *rpc_args)
+                        elif isinstance(rpc_args, dict):
+                            if sorted(args[2:]) != sorted(rpc_args.keys()):
+                                raise JsonRpcParamsInvalid
+                            return method(view(request), request, **rpc_args)
         return _mapped_callable
 
 

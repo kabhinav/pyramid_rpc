@@ -31,11 +31,39 @@ class TestJSONRPCMapper(unittest.TestCase):
         context = object()
         result = view_callable(context, request)
         self.assertEqual(result, 3)
+        
+    def test_view_callable_cls_with_list(self):
+
+        target = self._makeOne()
+        view_callable = target(DummyView)
+        request = testing.DummyRequest()
+        params = {'jsonrpc':'2.0', 'method':'dummy_view', 
+                  'params':[1, 2], 'id':'test'}
+        body = json.dumps(params)
+        request.json_body = params
+        request.rpc_args = [1, 2]
+        context = object()
+        result = view_callable(context, request)
+        self.assertEqual(result, 3)
+
 
     def test_view_callable_with_dict(self):
         target = self._makeOne()
         view_callable = target(dummy_view)
         request = testing.DummyRequest()
+        request.rpc_args = dict(a=3, b=4)
+        context = object()
+        result = view_callable(context, request)
+        self.assertEqual(result, 7)
+
+    def test_view_callable_cls_with_dict(self):
+        target = self._makeOne()
+        view_callable = target(DummyView)
+        request = testing.DummyRequest()
+        params = {'jsonrpc':'2.0', 'method':'dummy_view', 
+                  'params':dict(a=3, b=4), 'id':'test'}
+        body = json.dumps(params)
+        request.json_body = params
         request.rpc_args = dict(a=3, b=4)
         context = object()
         result = view_callable(context, request)
@@ -51,6 +79,21 @@ class TestJSONRPCMapper(unittest.TestCase):
         context = object()
         self.assertRaises(JsonRpcParamsInvalid, view_callable, context, request)
 
+    def test_view_callable_cls_with_invalid_args(self):
+        from pyramid_rpc.jsonrpc import JsonRpcParamsInvalid
+
+        target = self._makeOne()
+        view_callable = target(DummyView)
+        request = testing.DummyRequest()
+        params = {'jsonrpc':'2.0', 'method':'dummy_view', 
+                  'params':[], 'id':'test'}
+        body = json.dumps(params)
+        request.json_body = params
+        request.rpc_args = []
+        context = object()
+        self.assertRaises(JsonRpcParamsInvalid, view_callable, context, request)
+
+
     def test_view_callable_with_invalid_keywords(self):
         from pyramid_rpc.jsonrpc import JsonRpcParamsInvalid
 
@@ -60,6 +103,21 @@ class TestJSONRPCMapper(unittest.TestCase):
         request.rpc_args = {}
         context = object()
         self.assertRaises(JsonRpcParamsInvalid, view_callable, context, request)
+
+    def test_view_callable_cls_with_invalid_keywords(self):
+        from pyramid_rpc.jsonrpc import JsonRpcParamsInvalid
+
+        target = self._makeOne()
+        view_callable = target(DummyView)
+        request = testing.DummyRequest()
+        params = {'jsonrpc':'2.0', 'method':'dummy_view', 
+                  'params':{}, 'id':'test'}
+        body = json.dumps(params)
+        request.json_body = params
+        request.rpc_args = {}
+        context = object()
+        self.assertRaises(JsonRpcParamsInvalid, view_callable, context, request)
+
 
 class TestJSONRPCEndPoint(unittest.TestCase):
     def setUp(self):
@@ -526,9 +584,10 @@ def dummy_view(request, a, b):
     return a + b
 
 class DummyView:
-    def __init__(self, response=None, raise_exception=None):
+    def __init__(self, response=None, raise_exception=None, request=None):
         self.response = response
         self.raise_exception = raise_exception
+        self.request = request
 
     def __call__(self, context, request):
         if self.raise_exception is not None:
@@ -536,4 +595,7 @@ class DummyView:
         self.context = context
         self.request = request
         return self.response
+    
+    def dummy_view(self, request, a, b):
+        return a + b
 
